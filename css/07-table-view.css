@@ -1,0 +1,52 @@
+/* ============================================================
+   Pocket · 表格视图
+   条目表格（主页分区 / 分类页 / 搜索结果通用）+ 主页分区的列表模式
+   ============================================================ */
+
+/* ---------- 主页分区：列表模式（卡片收成整行） ---------- */
+.home-sec-grid.as-list{display:flex;flex-direction:column;gap:12px}
+.home-sec-grid.as-list .card{display:block}
+
+/* ---------- 主页分区：表格模式 ---------- */
+.home-sec-table{border-radius:var(--radius)}
+
+/* ---------- 表格本体 ---------- */
+#items.table{display:block}
+.tb-wrap{overflow-x:auto}
+.tb-table{
+  width:100%;border-collapse:separate;border-spacing:0;
+  background:var(--el-bg);border-radius:var(--radius);
+  box-shadow:var(--raised);overflow:hidden;font-size:13.5px;color:var(--text);
+}
+.tb-table th{
+  text-align:left;padding:10px 12px;font-size:12px;font-weight:700;color:var(--text3);
+  background:rgba(255,255,255,.35);border-bottom:1px solid rgba(174,190,212,.35);white-space:nowrap;
+}
+body.dark .tb-table th{background:rgba(255,255,255,.05)}
+.tb-table td{
+  padding:9px 12px;border-bottom:1px solid rgba(174,190,212,.22);
+  vertical-align:middle;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis;
+}
+.tb-table tbody tr:last-child td{border-bottom:none}
+tr.tb-row{cursor:pointer}
+tr.tb-row:hover td{background:var(--hover)}
+.tb-empty{text-align:center;color:var(--text3);padding:18px 12px !important}
+
+/* 列宽 */
+.tb-table .tb-pin{width:30px;text-align:center}
+.tb-table .tb-type{width:64px}
+.tb-table .tb-tags{width:160px}
+.tb-table .tb-time{width:92px;color:var(--text3);font-size:12.5px}
+.tb-table .tb-acts{width:190px;white-space:nowrap}
+
+/* 单元格内容 */
+.tb-name{font-weight:600;color:var(--text)}
+.tb-sub{margin-left:8px;font-weight:400;font-size:12px;color:var(--text3)}
+.tb-tags .card-tag{margin-right:4px}
+.tb-acts button{
+  font-size:12px;padding:3px 8px;border-radius:8px;margin-right:4px;
+  background:var(--el-bg);box-shadow:2px 2px 5px var(--sh-dark),-2px -2px 5px var(--sh-light);
+  color:var(--text2);
+}
+.tb-acts button:hover{color:var(--ink)}
+.tb-acts button:last-child{margin-right:0}

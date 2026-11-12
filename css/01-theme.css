@@ -1,0 +1,65 @@
+/* ============================================================
+   Pocket · 主题与变量
+   拟物皮肤的基础变量：配色、圆角、阴影、字体、深色模式覆盖
+   ------------------------------------------------------------
+   由原单文件版按功能切片而来；样式按此顺序叠加，
+   请勿调整 <link> 顺序（后面的文件会覆盖前面的同名变量）。
+   ============================================================ */
+/* ===== 水母岛风格 · Neumorphism 拟物皮肤（V1.0） ===== */
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Arial',-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif}
+:root{
+  --bg1:#f5f7fa;--bg2:#e4eaf5;
+  --el1:#e4eaf5;--el2:#f5f7fa;
+  /* 文字色：浅色背景下统一加深，弱化文字也保证 ≥7:1 对比度（第二十批） */
+  --text:#1e2738;--text2:#303b51;--text3:#3f4b62;
+  /* 强调文字色（按钮 / 徽标 / 链接 / 选中态）：只跟「自定义字体颜色」走，
+     永远不引用 --accent，改主题色不会牵动任何一处文字（第二十一批） */
+  --ink:#1e2738;--ink2:#303b51;
+  /* 纯色主题底上的文字：由 applySkin() 按主题色明度切换深 / 浅，保证可读 */
+  --on-accent:#ffffff;
+  --accent:#5B99E2;--accent-soft:rgba(91,153,226,.15);
+  --danger:#e53e3e;
+  --sh-dark:rgba(174,190,212,.4);--sh-light:rgba(255,255,255,.9);
+  --inset:inset 4px 4px 8px var(--sh-dark),inset -4px -4px 8px var(--sh-light);
+  --raised:6px 6px 12px var(--sh-dark),-6px -6px 12px var(--sh-light);
+  --raised-lg:10px 10px 20px var(--sh-dark),-10px -10px 20px var(--sh-light);
+  --el-bg:linear-gradient(135deg,var(--el1),var(--el2));
+  --hover:rgba(91,153,226,.13);
+  --radius:14px;
+}
+body.dark{
+  --bg1:#1f2a40;--bg2:#16213e;
+  --el1:#16213e;--el2:#1f2a40;
+  /* 深色模式反向兜底：弱化文字也要亮到能读清 */
+  --text:#f0f4fb;--text2:#d3dcec;--text3:#aebbd2;
+  --ink:#f0f4fb;--ink2:#d3dcec;
+  --on-accent:#ffffff;
+  --accent:#63b3ed;--accent-soft:rgba(99,179,237,.2);
+  --sh-dark:rgba(4,8,18,.55);--sh-light:rgba(58,74,118,.5);
+  --el-bg:linear-gradient(135deg,var(--el1),var(--el2));
+}
+html,body{height:100%}
+body{
+  background-color:var(--bg1);
+  background-image:linear-gradient(135deg,var(--bg1) 0%,var(--bg2) 100%);
+  background-attachment:fixed;
+  color:var(--text);display:flex;overflow:hidden;
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  transition:background .5s ease;touch-action:manipulation;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea{font-family:inherit;color:inherit}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:rgba(91,119,166,.35);border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ===== 第二十批 · 浅背景文字可读性 =====
+   浏览器默认给占位符叠了一层半透明，浅底上会淡到几乎看不见；
+   这里显式固定成 --text3 并关掉透明度，全项目所有输入框一次生效。
+   同时兜底：任何用 --text3 的弱化文字都不再被 opacity 二次削弱。 */
+::placeholder{color:var(--text3)!important;opacity:1!important;-webkit-text-fill-color:var(--text3)}
+:-ms-input-placeholder{color:var(--text3)!important;opacity:1!important}
+input,textarea,select{color:var(--text)}
+input:disabled,textarea:disabled,select:disabled{color:var(--text2);opacity:1}
+small,figcaption,.hint,.sub,.meta,.hb-muted,.hb-day-hint,.hb-f-hint,.hb-day-gt,.hb-card-sub,.hb-embed-cap,.hb-count-date,.hb-bar-hint,.hb-gt{opacity:1}
+

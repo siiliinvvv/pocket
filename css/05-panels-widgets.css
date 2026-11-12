@@ -1,0 +1,47 @@
+/* ============================================================
+   Pocket · 面板与悬浮球
+   回收站、通用面板、存储用量、悬浮工具球、对话框与提示
+   ------------------------------------------------------------
+   由原单文件版按功能切片而来；样式按此顺序叠加，
+   请勿调整 <link> 顺序（后面的文件会覆盖前面的同名变量）。
+   ============================================================ */
+/* ===== 回收站 / 通用面板 / 存储用量 ===== */
+#panelMask{position:fixed;inset:0;background:rgba(15,20,32,.42);backdrop-filter:blur(4px);z-index:98;display:none;align-items:flex-start;justify-content:center;padding-top:9vh}
+#panelMask.show{display:flex}
+.panel-body{max-height:50vh;overflow:auto;margin:8px 0;padding-right:2px}
+.tr-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;margin-bottom:6px;background:var(--el-bg);box-shadow:var(--inset)}
+.tr-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--hover);flex-shrink:0;font-size:15px}
+.tr-main{flex:1;min-width:0}
+.tr-t{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-s{font-size:11.5px;color:var(--text3);margin-top:2px}
+.tr-act{display:flex;gap:6px;flex-shrink:0}
+.tr-act button{font-size:12px;padding:4px 10px;border-radius:8px;background:var(--el-bg);box-shadow:2px 2px 5px var(--sh-dark),-2px -2px 5px var(--sh-light);color:var(--text2)}
+.tr-act button.dg{color:var(--danger)}
+.usage-bar{height:8px;border-radius:99px;background:var(--hover);overflow:hidden;margin:7px 0}
+.usage-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#8fc3f5);border-radius:99px;transition:width .3s ease}
+.usage-line{font-size:12px;color:var(--text2);line-height:1.85}
+.usage-line b{color:var(--text)}
+#trashCount{font-size:10.5px;padding:0 6px;border-radius:99px;background:var(--accent);color:var(--on-accent);line-height:16px;display:none;flex-shrink:0}
+#trashCount.show{display:inline-block}
+
+/* ===== 悬浮工具球（文库 / 回收站） ===== */
+#fab{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.fab-main{
+  width:48px;height:48px;border-radius:50%;font-size:20px;line-height:1;
+  background:var(--el-bg);box-shadow:var(--raised-lg);transition:all .2s ease;
+}
+.fab-main:hover{transform:scale(1.07)}
+.fab-main.on{box-shadow:var(--inset);transform:scale(.98)}
+.fab-menu{
+  display:none;flex-direction:column;gap:4px;padding:8px;border-radius:14px;
+  background:var(--el-bg);box-shadow:var(--raised-lg);
+}
+#fab.open .fab-menu{display:flex}
+.fab-menu button{
+  display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2);
+  padding:7px 12px;border-radius:10px;white-space:nowrap;transition:all .15s ease;text-align:left;
+}
+.fab-menu button:hover{background:var(--hover);color:var(--text)}
+.fab-menu .f-count,.fab-menu #trashCount{font-size:10.5px;padding:0 6px;border-radius:99px;background:var(--accent);color:var(--on-accent);line-height:16px}
+body.shared .fab-auth{display:none !important}
+

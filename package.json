@@ -1,0 +1,12 @@
+{
+  "name": "ovovv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OVOvv 个人主页：静态站点 + AI 资讯服务端抓取（单端口 HTTP 服务）",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

@@ -1,0 +1,36 @@
+# Netlify 部署配置（免构建静态站点）
+# 入口为 index.html，访问根路径 / 直接命中，无需 redirect
+
+[build]
+  publish = "."
+  # AI 资讯服务端抓取（真实 RSS，绕开浏览器 CORS 与第三方公共代理）
+  functions = "netlify/functions"
+
+# 前端统一请求 /api/ai-news；静态托管下 404 时会自动回退到公共 RSS 代理
+[[redirects]]
+  from = "/api/ai-news"
+  to = "/.netlify/functions/ai-news"
+  status = 200
+
+# 大模型代理：OpenAI 兼容接口，密钥只随单次请求传递
+[[redirects]]
+  from = "/api/llm"
+  to = "/.netlify/functions/llm"
+  status = 200
+
+# 入口页不缓存，保证每次重新部署后立刻生效
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# 静态资源按文件名缓存 1 小时
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"

@@ -1,0 +1,102 @@
+/* ============================================================
+   OVOvv · 多维表格 & 画布
+   ============================================================ */
+
+/* ---------- 卡片预览 ---------- */
+.grid-card,.canvas-card{cursor:pointer;user-select:none}
+.gv-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.gv-ico{font-size:20px}
+.gv-title{font-weight:700;font-size:14.5px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gv-meta{font-size:11.5px;color:var(--text3);margin-bottom:8px}
+.gv-prow{font-size:12.5px;color:var(--text2);padding:3px 0 3px 2px;border-top:1px dashed var(--inset);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gv-prow.gv-empty{color:var(--text3);font-style:italic}
+.gv-open{margin-top:8px;font-size:12px;font-weight:600;color:var(--ink)}
+.grid-card:hover,.canvas-card:hover{box-shadow:0 6px 18px rgba(0,0,0,.12)}
+.cv-mini{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.cv-chip{font-size:11px;padding:3px 8px;border-radius:999px;color:#3a3a3a;box-shadow:var(--inset);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cv-chip.cv-empty{background:var(--inset);color:var(--text3);font-style:italic}
+
+/* ---------- 多维表格编辑器 ---------- */
+#gridView{
+  position:fixed;inset:0;z-index:900;display:none;flex-direction:column;
+  background:var(--bg1);
+}
+#gridView.show{display:flex}
+.gv-top{
+  display:flex;align-items:center;gap:12px;padding:14px 22px;flex-shrink:0;
+  background:var(--el-bg);box-shadow:var(--sh-light);
+}
+.gv-top #gvTitle{font-size:16.5px;font-weight:800;color:var(--text)}
+.gv-tip{font-size:12px;color:var(--text3)}
+.flex-sp{flex:1}
+#gvTable{flex:1;overflow:auto;padding:24px}
+#gvTable table{border-collapse:separate;border-spacing:0;background:var(--el-bg);border-radius:14px;box-shadow:var(--sh-light);min-width:600px}
+#gvTable th,#gvTable td{border-bottom:1px solid var(--inset);border-right:1px solid var(--inset);padding:0;min-width:150px}
+#gvTable th:last-child,#gvTable td:last-child{border-right:none}
+#gvTable tr:last-child td{border-bottom:none}
+#gvTable th{padding:9px 10px;background:var(--raised);text-align:left;position:sticky;top:0;z-index:2}
+.gv-col{display:flex;align-items:center;gap:6px}
+.gv-cname{font-weight:700;font-size:12.5px;color:var(--text);cursor:pointer}
+.gv-cname:hover{text-decoration:underline}
+.gv-ctype{font-size:10.5px;padding:1.5px 7px;border-radius:999px;background:var(--accent-soft);color:var(--ink);cursor:pointer;white-space:nowrap}
+.gv-x{border:none;background:none;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:6px;opacity:0}
+tr:hover .gv-x,th:hover .gv-x{opacity:1}
+.gv-x:hover{background:var(--hover);color:#e05656}
+#gvTable td{padding:5px 8px}
+.gv-in,.gv-sel{
+  width:100%;border:none;background:none;outline:none;font:inherit;font-size:13px;color:var(--text);
+  padding:5px 4px;border-radius:7px;
+}
+.gv-in:focus,.gv-sel:focus{background:var(--accent-soft)}
+.gv-chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;display:block;margin:4px auto}
+.gv-rn{min-width:44px!important;text-align:center;background:var(--raised)}
+.gv-addcol button,#gvAddRow{
+  border:none;background:none;color:var(--text3);font-size:12.5px;cursor:pointer;padding:8px 14px;width:100%;
+  font-family:inherit;
+}
+.gv-addcol button:hover,#gvAddRow:hover{color:var(--ink);background:var(--accent-soft)}
+.gv-addrow td{padding:0}
+
+/* ---------- 画布编辑器 ---------- */
+#canvasView{
+  position:fixed;inset:0;z-index:900;display:none;flex-direction:column;
+  background:var(--bg1);
+}
+#canvasView.show{display:flex}
+.cb-top{
+  display:flex;align-items:center;gap:8px;padding:12px 20px;flex-shrink:0;flex-wrap:wrap;
+  background:var(--el-bg);box-shadow:var(--sh-light);
+}
+.cb-top #cbTitle{font-size:16.5px;font-weight:800;color:var(--text);margin-right:6px}
+.cb-status{font-size:12px;color:var(--text3)}
+.cb-sep{width:1px;height:20px;background:var(--inset);margin:0 4px}
+.cb-body{flex:1;display:flex;min-height:0}
+#cbBoard{
+  flex:1;position:relative;overflow:hidden;cursor:grab;
+  background-image:radial-gradient(var(--inset) 1.2px,transparent 1.2px);
+  background-size:26px 26px;
+}
+#cbBoard:active{cursor:grabbing}
+#cbStage{position:absolute;left:0;top:0;width:4000px;height:3000px;transform-origin:0 0}
+.cb-edges{position:absolute;left:0;top:0;pointer-events:none}
+.cb-edge{fill:none;stroke:var(--accent);stroke-width:2.2;opacity:.65;stroke-dasharray:7 5}
+.cb-note{
+  position:absolute;width:180px;min-height:90px;border-radius:12px;
+  box-shadow:0 4px 14px rgba(0,0,0,.14);color:#333;cursor:pointer;
+  border:1.5px solid rgba(0,0,0,.06);
+}
+.cb-note.sel{outline:2.5px solid var(--accent);outline-offset:2px}
+.cb-note.from{outline:2.5px dashed var(--accent);outline-offset:2px}
+.cb-note-bar{height:16px;border-radius:10px 10px 0 0;background:rgba(0,0,0,.08);cursor:move}
+.cb-note-txt{padding:8px 12px 12px;font-size:13px;line-height:1.5;word-break:break-word;pointer-events:none}
+.cb-side{
+  width:240px;flex-shrink:0;padding:16px;border-left:1px solid var(--inset);
+  background:var(--el-bg);display:flex;flex-direction:column;gap:10px;
+}
+.cb-side b{font-size:12.5px;color:var(--text2)}
+#cbEditText{
+  border:none;border-radius:10px;background:var(--raised);box-shadow:var(--inset);
+  padding:10px;font:inherit;font-size:13px;color:var(--text);resize:vertical;outline:none;min-height:140px;
+}
+#cbEditText:focus{box-shadow:0 0 0 2px var(--accent-soft)}
+.cb-help{font-size:11.5px;color:var(--text3);line-height:2}

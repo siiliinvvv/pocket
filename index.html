@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>OVOvv</title>
+<script id="seedLoader">
+/* 首次打开且本机还没有数据时，同步载入随站点一起分发的初始数据（含上传的文件）。
+   已有数据 / 分享版 / 附件已落库后都不再加载，既不覆盖用户内容，也不重复下载。
+   用 document.write 是为了保证 __BOX_SEED__ 在 01-config.js 之前就绪（动态插入的脚本是异步的）。 */
+(function(){
+  try{
+    if(window.__BOX_SHARED__ || window.__BOX_NODATA__) return;
+    /* 第二十五批：分享链接选择「不包含分享数据」时带 nodata=1 —— 不加载站点种子，
+       并让数据层改用独立存储键，打开就是一个干净的空白空间。 */
+    try{ if(new URLSearchParams(location.search).get('nodata')==='1') return; }catch(e){}
+    /* 已有数据且附件已落库（或本来就是老用户）→ 完全不加载种子 */
+    if(localStorage.getItem('treasureBoxData_v1') && localStorage.getItem('tb_seed_pending')!=='1') return;
+    /* 第二十七批：优先读站长「同步我的数据」推送上来的分享快照（比内置种子新）。
+       用同步 XHR 保证 __BOX_SEED__ 在 01-config.js 之前就绪；仅 http(s) 且带 sharecode 时尝试，
+       失败（404 / 离线 / file://）自动回退内置种子。 */
+    var __code=null;
+    try{ __code=new URLSearchParams(location.search).get('sharecode'); }catch(e){}
+    if(__code && /^https?:$/.test(location.protocol)){
+      try{
+        /* 同步 XHR 偶发失败（平台门禁竞态 / 网络抖动）会导致整箱空白，重试一次 */
+        var __j=null;
+        for(var __try=0;__try<2&&!__j;__try++){
+          try{
+            var __xhr=new XMLHttpRequest();
+            __xhr.open('GET','/api/share?code='+encodeURIComponent(__code),false);
+            __xhr.send(null);
+            if(__xhr.status===200) __j=JSON.parse(__xhr.responseText);
+          }catch(e){}
+        }
+        if(__j&&__j.state){
+          window.__BOX_SEED__={state:__j.state,assets:__j.assets||{}};
+          window.__BOX_SHARE_SNAP__={ts:__j.ts||0};
+          return;
+        }
+      }catch(e){}
+    }
+    document.write('<script src="data/seed.js"><' + '/script>');
+  }catch(e){}
+})();
+</script>
+<!--
+  ============================================================
+  Pocket · 个人知识收纳空间（模块化版）
+  本文件只负责「页面骨架 + 加载模块」，不含任何业务代码：
+    样式  → css/01 ~ 06*.css
+    逻辑  → js/00 ~ 35*.js（按功能拆分，加载顺序不可调整）
+  数据存储：文字 → localStorage；照片 / 文件 / 头像 / 背景 → IndexedDB
+  云端存储：设置里填 GitHub 私有仓库，开启自动同步后改动会自动上传
+  备份方式：① 悬浮球「导出备份」下载 JSON、「导入」恢复
+            ② 设置 → 从云端恢复
+  改造说明与模块清单见同目录 README.md
+  ============================================================
+-->
+  <link rel="stylesheet" href="css/01-theme.css">
+  <link rel="stylesheet" href="css/02-sidebar.css">
+  <link rel="stylesheet" href="css/03-home-main.css">
+  <link rel="stylesheet" href="css/04-reader-editor.css">
+  <link rel="stylesheet" href="css/05-panels-widgets.css">
+  <link rel="stylesheet" href="css/06-interaction.css">
+  <link rel="stylesheet" href="css/07-table-view.css">
+  <link rel="stylesheet" href="css/09-grid-canvas.css">
+
+<style>
+/* ===== 开屏页（内联，保证脚本加载前就能绘制；纯色清新梦幻风，无渐变） ===== */
+#splash{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+  background:#f0f7f4;overflow:hidden;cursor:pointer}
+body.dark #splash{background:#1f262b}
+/* 梦幻漂浮泡泡：纯色低透明 + 大模糊（无渐变），缓慢漂移 */
+#splash .sp-orb{position:absolute;border-radius:50%;pointer-events:none}
+#splash .sp-o1{width:300px;height:300px;left:6%;top:10%;background:#a8dcd0;opacity:.42;filter:blur(26px);animation:spDrift 11s ease-in-out infinite alternate}
+#splash .sp-o2{width:210px;height:210px;right:10%;top:16%;background:#bbd5f2;opacity:.46;filter:blur(24px);animation:spDrift 13s ease-in-out -3s infinite alternate-reverse}
+#splash .sp-o3{width:250px;height:250px;right:20%;bottom:4%;background:#e7d1ee;opacity:.4;filter:blur(28px);animation:spDrift 15s ease-in-out -6s infinite alternate}
+#splash .sp-o4{width:170px;height:170px;left:14%;bottom:10%;background:#f6cfdd;opacity:.44;filter:blur(22px);animation:spDrift 12s ease-in-out -8s infinite alternate-reverse}
+#splash .sp-o5{width:110px;height:110px;left:44%;top:6%;background:#c8e8db;opacity:.5;filter:blur(18px);animation:spDrift 10s ease-in-out -4s infinite alternate}
+@keyframes spDrift{from{transform:translate(0,0) scale(1)}to{transform:translate(34px,-26px) scale(1.12)}}
+/* 闪烁星星 */
+#splash .sp-star{position:absolute;font-size:14px;pointer-events:none;animation:spTwinkle 2.6s ease-in-out infinite}
+#splash .sp-s1{left:20%;top:26%;color:#7fc8b9;animation-delay:.2s}
+#splash .sp-s2{left:64%;top:18%;color:#9db8e8;animation-delay:1.1s;font-size:11px}
+#splash .sp-s3{left:74%;top:58%;color:#e3a9c3;animation-delay:1.8s}
+#splash .sp-s4{left:12%;top:60%;color:#9db8e8;animation-delay:.7s;font-size:10px}
+#splash .sp-s5{left:40%;top:78%;color:#7fc8b9;animation-delay:2.2s;font-size:12px}
+#splash .sp-s6{left:86%;top:38%;color:#7fc8b9;animation-delay:1.5s;font-size:10px}
+@keyframes spTwinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0deg)}50%{opacity:.9;transform:scale(1) rotate(90deg)}}
+#splash .sp-card{text-align:center;animation:spCardIn .55s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes spCardIn{from{opacity:0;transform:scale(.82) translateY(26px)}to{opacity:1;transform:none}}
+#splash .sp-logo{width:92px;height:92px;margin:0 auto 18px;border-radius:28px;background:#fff;
+  box-shadow:0 14px 40px rgba(87,150,130,.25);display:flex;align-items:center;justify-content:center;font-size:50px;
+  animation:spLogoPop .7s cubic-bezier(.2,1.4,.4,1) .1s both}
+body.dark #splash .sp-logo{background:#2b3238}
+@keyframes spLogoPop{from{transform:scale(0) rotate(-14deg)}to{transform:scale(1) rotate(0)}}
+#splash .sp-name{font-size:30px;font-weight:800;color:#2f3d38;letter-spacing:1px;animation:spUp .5s ease .22s both}
+#splash .sp-sub{font-size:13px;color:#7a8a92;margin-top:8px;animation:spUp .5s ease .38s both}
+body.dark #splash .sp-name{color:#dfe8e4}
+body.dark #splash .sp-sub{color:#9aa8a2}
+@keyframes spUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#splash .sp-bar{width:180px;height:4px;border-radius:3px;background:#2f3d3816;margin:26px auto 0;overflow:hidden}
+#splash .sp-bar i{display:block;height:100%;width:0;border-radius:3px;background:#57b99b;animation:spBar 1.5s ease forwards}
+@keyframes spBar{from{width:0}to{width:100%}}
+#splash .sp-skip{position:absolute;right:22px;bottom:20px;border:none;background:#ffffffcc;color:#5a7268;
+  font-size:12px;padding:6px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
+#splash.out{opacity:0;transform:scale(1.04);transition:opacity .38s ease,transform .38s ease;pointer-events:none}
+@media (prefers-reduced-motion: reduce){#splash{display:none}}
+</style>
+</head>
+<body>
+
+<!-- 开屏页：下面的内联脚本负责自动关闭（不依赖任何外链脚本）；js/41-splash.js 只负责填入头像与空间名 -->
+<div id="splash">
+  <span class="sp-orb sp-o1"></span><span class="sp-orb sp-o2"></span><span class="sp-orb sp-o3"></span>
+  <span class="sp-orb sp-o4"></span><span class="sp-orb sp-o5"></span>
+  <span class="sp-star sp-s1">✦</span><span class="sp-star sp-s2">✦</span><span class="sp-star sp-s3">✦</span>
+  <span class="sp-star sp-s4">✦</span><span class="sp-star sp-s5">✦</span><span class="sp-star sp-s6">✦</span>
+  <div class="sp-card">
+    <div class="sp-logo" id="spLogo">🧸</div>
+    <div class="sp-name" id="spName">OVOvv</div>
+    <div class="sp-sub">整理每一份灵感与收藏</div>
+    <div class="sp-bar"><i></i></div>
+  </div>
+  <button class="sp-skip">跳过 ›</button>
+</div>
+<script>
+/* 开屏保底关闭：即使任何外部脚本加载失败（如分享版内联缺失），开屏也不会卡住 */
+(function(){
+  var s=document.getElementById('splash'); if(!s) return;
+  var closed=false;
+  function close(){ if(closed) return; closed=true;
+    s.classList.add('out'); setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); },420); }
+  s.addEventListener('click',close); setTimeout(close,1650);
+})();
+</script>
+
+<!-- 侧边栏 -->
+<nav id="sidebar">
+  <div class="sb-head">
+    <div class="avatar" id="avatarBox" title="点击自定义头像与背景">🧸</div>
+    <div class="space-name" id="spaceName" title="点击重命名">OVOvv</div>
+  </div>
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="searchInput" aria-label="搜索内容" type="text" placeholder="搜索全部内容…（#标签 / 类型:pdf / 夹:读书）" title="支持语法：#标签、类型:pdf｜文件｜文字｜照片、夹:收纳夹名">
+    <button id="searchClear" type="button" title="退出搜索（Esc）" aria-label="退出搜索" style="display:none">✕</button>
+    <div id="searchHist" role="listbox" aria-label="最近搜索"></div>
+  </div>
+  <div class="sb-label">收纳夹</div>
+  <div id="folderList"></div>
+  <button class="sb-add" id="addFolderBtn">＋ 新建收纳夹</button>
+  <div class="sb-foot">
+    <div class="sync-line" id="syncLine" title="点击打开设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-.88-8.91A6 6 0 1 0 6 15.7"/><path d="M12 12v9m0-9 3 3m-3-3-3 3"/></svg>
+      <span id="syncMsg">云端未配置，点击设置</span>
+    </div>
+    <div class="sb-foot-row" style="display:none"></div>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+  </div>
+</nav>
+<div id="sbMask"></div>
+
+<!-- 主区 -->
+<div id="main">
+  <div class="topbar">
+    <button id="sbToggle" title="收起 / 展开侧边栏">◧</button>
+    <button id="hamburger">☰</button>
+    <div class="crumb">
+      <span class="c-icon" id="crumbIcon" title="点击换图标">🗂</span>
+      <span id="crumbName" title="点击重命名">收集箱</span>
+      <span class="c-mode" id="crumbMode"></span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <span class="count-hint" id="countHint"></span>
+    <button class="topbar-cam" id="topbarCam" title="上传 / 更换主页顶部栏背景">📷</button>
+    <button class="topbar-cam" id="topbarClr" title="移除主页顶部栏背景" style="display:none">✕</button>
+    <div class="top-actions">
+      <select id="searchSort" title="搜索结果排序">
+        <option value="score">相关度优先</option>
+        <option value="time">最新在前</option>
+        <option value="name">按名称 A→Z</option>
+      </select>
+      <select id="sortSel" title="排序方式（自定义 = 手动拖拽调整顺序）">
+        <option value="time">最近创建</option>
+        <option value="timeAsc">最早创建</option>
+        <option value="opened">最近打开</option>
+        <option value="name">按名称 A→Z</option>
+        <option value="nameDesc">按名称 Z→A</option>
+        <option value="custom">自定义排序</option>
+      </select>
+      <button id="uploadBtn" title="批量上传（照片/文件，可多选）">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0 4 4m-4-4-4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </button>
+      <button id="batchBtn" title="批量管理：勾选内容后可批量删除">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="m3 7 2 2 4-4"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8M13 12h8M13 18h8"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="scrollArea">
+    <div class="banner" id="banner">
+      <button class="banner-btn" id="bannerCam" title="上传 / 更换此横幅的背景图">📷</button>
+      <button class="banner-btn" id="bannerClr" title="移除自定义背景图" style="display:none">✕</button>
+    </div>
+    <div class="folder-hero">
+      <span class="hero-icon" id="heroIcon" title="点击换图标">🗂</span>
+      <div class="hero-row">
+        <div class="hero-sub" id="heroSub"></div>
+        <label class="cols-pick" id="colsPick" title="主页每行显示的卡片数量">每行
+          <select id="homeColsSel">
+            <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option><option value="8">8</option>
+          </select> 个
+        </label>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-box">
+        <textarea id="composerText" rows="1" placeholder="记点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
+        <div class="composer-row">
+          <span class="hint" id="composerHint">也可以直接把照片、文件拖进来</span>
+          <button class="cbtn" id="addPhotoBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            照片
+          </button>
+          <button class="cbtn" id="addFileBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            文件
+          </button>
+          <button class="cbtn" id="addNoteBtn" title="新建富文本笔记（自动保存，支持图片、标题、列表、双向链接）">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            笔记
+          </button>
+          <button class="cbtn" id="addLinkBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+            链接
+          </button>
+          <button class="cbtn" id="addGridBtn" title="新建多维表格（自定义列：文本 / 数字 / 单选 / 日期 / 勾选）">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/></svg>
+            多维表格
+          </button>
+          <button class="cbtn" id="addCanvasBtn" title="新建画布（自由摆放便签、连线梳理思路）">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="14" y="13" width="7" height="8" rx="1.5"/><path d="M7 11v4a3 3 0 0 0 3 3h4"/></svg>
+            画布
+          </button>
+          <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+          <input type="file" id="fileInput" multiple style="display:none">
+        </div>
+      </div>
+    </div>
+
+    <div class="tag-bar" id="tagBar"></div>
+    <div id="itemsWrap"><div id="items"></div></div>
+  </div>
+</div>
+
+<!-- 知识漫游 -->
+<div id="roam">
+  <div class="roam-card">
+    <div class="roam-head">
+      <span class="roam-scope" id="roamScope">—</span>
+      <span class="roam-pos" id="roamPos">1 / 1</span>
+      <button class="roam-x" id="roamClose" title="关闭（Esc）">✕</button>
+    </div>
+    <div class="roam-prog"><i id="roamProg" style="width:0"></i></div>
+    <div class="roam-body">
+      <div class="roam-title" id="roamTitle">—</div>
+      <div class="roam-text" id="roamText"></div>
+    </div>
+    <div class="roam-foot">
+      <span class="roam-src" id="roamSrc"></span>
+      <div class="roam-acts">
+        <button id="roamOpen">📖 打开原文</button>
+        <button id="roamShuffle">🎲 随机</button>
+        <button id="roamPrev">‹ 上一个</button>
+        <button id="roamNext">下一个 ›</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 灯箱 -->
+<div id="lightbox">
+  <img id="lbImg" alt="">
+  <button class="lb-nav" id="lbPrev">‹</button>
+  <button class="lb-nav" id="lbNext">›</button>
+  <div class="lb-bar">
+    <span id="lbIdx"></span>
+    <a id="lbDownload" download>下载原图</a>
+    <button id="lbClose">关闭 (Esc)</button>
+  </div>
+</div>
+
+<div id="dropMask">松手即可收纳进来</div>
+<div id="batchBar">
+  <label class="bb-all"><input type="checkbox" id="batchAll"> 全选本页</label>
+  <span class="bb-count" id="batchCount">已选 0 条</span>
+  <button class="btn ghost" id="batchMoveBtn">📁 移动到…</button>
+  <button class="btn ghost" id="batchMergeBtn" title="把勾选的文档合并成一份新文档">🧷 合并文档</button>
+  <button class="btn ghost" id="batchTagBtn">🏷 打标签</button>
+  <button class="btn ghost" id="batchPinBtn">📌 置顶</button>
+  <button class="btn ghost" id="batchUnpinBtn">📍 取消置顶</button>
+  <button class="btn danger" id="batchDelBtn">🗑 删除所选</button>
+  <button class="btn ghost" id="batchExitBtn">完成</button>
+</div>
+<input type="file" id="anyInput" multiple style="display:none">
+<input type="file" id="bannerInput" accept="image/*" style="display:none">
+<input type="file" id="attachInput" multiple style="display:none">
+
+<!-- 悬浮工具球：文库 / 回收站 -->
+<div id="fab">
+  <div class="fab-menu" id="fabMenu">
+    <button id="fabReader" title="打开内置阅读器">📖 <span style="flex:1">HTML / PDF 文库</span><span class="f-count" id="readerCount"></span></button>
+    <button id="fabTrash" class="fab-auth" title="回收站：删掉的内容 30 天内可还原">🗑 <span style="flex:1">回收站</span><span id="trashCount"></span></button>
+    <button id="fabExport" class="fab-auth" title="导出为 JSON 备份文件">⬇️ <span style="flex:1">导出备份</span></button>
+    <button id="fabImport" class="fab-auth" title="从 JSON 备份恢复">📥 <span style="flex:1">导入</span></button>
+    <button id="fabTheme" title="切换深色模式">🌙 <span style="flex:1">深色模式</span></button>
+  </div>
+  <button class="fab-main" id="fabMain" title="文库 / 回收站">🧰</button>
+</div>
+
+<div id="toasts" aria-live="polite" role="status"></div>
+
+<!-- 阅读器 -->
+<div id="reader">
+  <div class="rd-side" id="rdSide">
+    <div class="rd-tabs">
+      <button id="tabDocs">📄 列表</button>
+      <button id="tabToc">📑 目录</button>
+      <button id="tabMarks" title="本文的划线标注">🖍 标注</button>
+      <button id="tabLinks">🔗 关联</button>
+    </div>
+    <div class="rd-filter" id="rdFilter">
+      <select id="rdFolderSel" title="按收纳夹筛选文档"></select>
+      <span class="rd-filter-count" id="rdFilterCount"></span>
+      <button id="rdNewDoc" title="新建可编辑文档">＋ 新建</button>
+    </div>
+    <div class="rd-list" id="rdDocList"></div>
+    <div class="rd-list" id="rdToc" style="display:none"></div>
+    <div class="rd-list" id="rdMarks" style="display:none"></div>
+    <div class="rd-list" id="rdLinks" style="display:none"></div>
+  </div>
+  <div class="rd-main">
+    <div class="rd-top">
+      <button id="rdSideBtn">☰</button>
+      <span id="rdTitle">—</span>
+      <span class="count-hint" id="rdPos"></span>
+      <button id="rdMarksBtn" title="本文的划线标注（选中正文文字即可添加）">🖍 标注</button>
+      <button id="rdAttach" title="跳到本文的附件框">📎 附件</button>
+      <button id="rdExport">⬇ 导出</button>
+      <button id="rdEdit">✏️ 编辑</button>
+      <button id="rdClose">关闭 (Esc)</button>
+    </div>
+    <iframe id="rdFrame" title="文档预览" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+    <div id="rdLoading" aria-live="polite"><div class="rd-spin"></div><span id="rdLoadingTxt">正在打开…</span></div>
+  </div>
+</div>
+
+<!-- 文档编辑器（可编辑 HTML 文档，保留格式与图片） -->
+<div id="docEditor">
+  <div class="ed-top">
+    <button id="edSideBtn" style="display:none">☰</button>
+    <span id="edTitle">—</span>
+    <span class="ed-status" id="edCount"></span>
+    <span class="ed-status" id="edStatus"></span>
+    <button id="edVerBtn" title="本文的版本历史与差异对比">🕘 版本</button>
+    <button id="edSave">保存</button>
+    <button id="edClose">完成 (Esc)</button>
+  </div>
+  <div class="ed-bar" id="edBar">
+    <span class="ed-grp">
+      <button id="edUndoBtn" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+      <button id="edRedoBtn" title="重做 (Ctrl+Shift+Z)">↷ 重做</button>
+    </span>
+    <span class="ed-grp">
+      <button data-cmd="bold" title="加粗"><b>B</b></button>
+      <button data-cmd="italic" title="斜体"><i>I</i></button>
+      <button data-cmd="underline" title="下划线"><u>U</u></button>
+      <button data-cmd="strikeThrough" title="删除线"><s>S</s></button>
+    </span>
+    <span class="ed-grp">
+      <button data-block="p" title="正文">正文</button>
+      <button data-block="h1" title="标题1">H1</button>
+      <button data-block="h2" title="标题2">H2</button>
+      <button data-block="h3" title="标题3">H3</button>
+    </span>
+    <span class="ed-grp">
+      <button data-cmd="insertUnorderedList" title="无序列表">• 列表</button>
+      <button data-cmd="insertOrderedList" title="有序列表">1. 列表</button>
+      <button id="edTaskBtn" title="任务清单（勾选待办）">☑ 任务</button>
+    </span>
+    <span class="ed-grp">
+      <button data-cmd="formatBlock" data-val="blockquote" title="引用">❝ 引用</button>
+      <button id="edCodeBtn" title="代码块（或输入 ``` 后回车）">⌨ 代码块</button>
+      <button data-cmd="insertHorizontalRule" title="分隔线（或输入 --- 后回车）">— 分隔</button>
+    </span>
+    <span class="ed-grp">
+      <button id="edImgBtn" title="插入图片（嵌入文档内）">🖼 图片</button>
+      <button id="edWikiBtn" title="插入双向链接 [[文档名]]">🔗 链接</button>
+      <button id="edTableBtn" title="插入表格">☑ 表格</button>
+      <button id="edMindBtn" title="插入思维导图（按缩进写层级）">🧠 导图</button>
+      <button id="edGridBtn" title="插入 / 编辑多维表格（轻量数据表）">📊 多维表</button>
+    </span>
+    <span class="ed-grp">
+      <label class="ed-color" title="文字颜色">🎨<input type="color" id="edFgColor" value="#2d3748"></label>
+      <label class="ed-color" title="背景高亮">🖍<input type="color" id="edHlColor" value="#fff3ac"></label>
+      <button data-cmd="removeFormat" title="清除格式">✕ 格式</button>
+    </span>
+    <span class="ed-grp">
+      <button id="edFindBtn" title="查找替换 (Ctrl+F)">🔍 查找</button>
+    </span>
+  </div>
+  <div id="edFind">
+    <input type="text" id="edFindInput" placeholder="查找…" autocomplete="off">
+    <span id="edFindCount"></span>
+    <button id="edFindPrev" title="上一个">↑</button>
+    <button id="edFindNext" title="下一个">↓</button>
+    <span class="ed-sep"></span>
+    <input type="text" id="edReplaceInput" placeholder="替换为…" autocomplete="off">
+    <button id="edRepOne">替换</button>
+    <button id="edRepAll">全部替换</button>
+    <label><input type="checkbox" id="edFindCase"> 区分大小写</label>
+    <span class="ed-sep"></span>
+    <button id="edFindClose" title="关闭">✕</button>
+  </div>
+  <iframe id="edFrame" title="文档编辑" sandbox="allow-same-origin"></iframe>
+  <div id="wikiPick">
+    <input type="text" id="wikiPickInput" placeholder="搜索或输入文档名…">
+    <div id="wikiPickList"></div>
+  </div>
+  <div id="imgTools" role="toolbar" aria-label="图片工具">
+    <button data-it="small" title="缩小">－</button>
+    <button data-it="big" title="放大">＋</button>
+    <button data-it="w25">25%</button>
+    <button data-it="w50">50%</button>
+    <button data-it="w100">100%</button>
+    <span class="it-sep"></span>
+    <button data-it="left" title="左浮动">⬅ 左</button>
+    <button data-it="center" title="居中">⬌ 中</button>
+    <button data-it="right" title="右浮动">右 ➡</button>
+    <button data-it="inline" title="行内">行内</button>
+    <span class="it-sep"></span>
+    <button data-it="caption">图注</button>
+    <button data-it="alt">ALT</button>
+    <button data-it="replace">替换</button>
+    <button data-it="del" title="删除图片">🗑</button>
+  </div>
+  <input type="file" id="edImgInput" accept="image/*" style="display:none">
+</div>
+
+<!-- 多维表格编辑器 -->
+<div id="gridView">
+  <div class="gv-top">
+    <span id="gvTitle">多维表格</span>
+    <span class="gv-tip">点列头可改列名 / 类型，单元格直接编辑，自动保存</span>
+    <span class="flex-sp"></span>
+    <button class="btn ghost" id="gvRename">✏️ 重命名</button>
+    <button class="btn primary" id="gvClose">完成 (Esc)</button>
+  </div>
+  <div id="gvTable"></div>
+</div>
+
+<!-- 画布编辑器 -->
+<div id="canvasView">
+  <div class="cb-top">
+    <span id="cbTitle">画布</span>
+    <span id="cbStatus" class="cb-status"></span>
+    <span class="flex-sp"></span>
+    <button class="btn ghost" id="cbAdd">＋ 便签</button>
+    <button class="btn ghost" id="cbLink" title="选中一张便签后，点此再点另一张即可连线">🔗 连线</button>
+    <button class="btn ghost" id="cbColor" title="换一张便签的颜色">🎨 换色</button>
+    <button class="btn ghost" id="cbDel" title="删除选中的便签">🗑</button>
+    <span class="cb-sep"></span>
+    <button class="btn ghost" id="cbZoomOut">－</button>
+    <button class="btn ghost" id="cbZoomFit">1:1</button>
+    <button class="btn ghost" id="cbZoomIn">＋</button>
+    <button class="btn ghost" id="cbRename">✏️</button>
+    <button class="btn primary" id="cbClose">完成 (Esc)</button>
+  </div>
+  <div class="cb-body">
+    <div id="cbBoard">
+      <div id="cbStage"></div>
+    </div>
+    <div class="cb-side">
+      <b>选中便签</b>
+      <textarea id="cbEditText" placeholder="点选便签后在这里输入文字…" rows="8"></textarea>
+      <div class="cb-help">
+        双击空白处新建便签<br>拖便签顶栏移动 · 空白处拖动平移<br>Shift+拖 或 拖顶栏 = 移动<br>Del 键删除选中便签
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置弹窗 · 第二十五批：按 iOS 分组列表重排（白色圆角卡片 + 行 + 右侧开关/箭头/数值） -->
+<div id="settingsMask">
+  <div class="modal set-modal" style="width:min(560px,94vw)">
+    <div class="set-topbar">
+      <div class="set-gear" aria-hidden="true">⚙</div>
+      <h3>设置</h3>
+      <button class="set-x" id="settingsClose" aria-label="关闭设置">×</button>
+    </div>
+
+    <div class="set-sec" id="secCloud">
+      <b>☁️ 云端同步</b>
+      <div class="set-list">
+        <label class="set-item">
+          <span class="set-item-t">开启自动同步<small>改动约 1.5 秒后上传，其他设备自动拉取合并</small></span>
+          <span class="set-item-r"><input type="checkbox" id="ghAuto" class="set-sw"></span>
+        </label>
+        <div class="set-item set-tap" id="ghCfgToggle" role="button" tabindex="0">
+          <span class="set-item-t">GitHub 仓库配置</span>
+          <span class="set-item-r"><span id="ghCfgVal">未配置</span><span class="set-chev">›</span></span>
+        </div>
+        <div class="set-item">
+          <span class="set-item-t">单文件大小上限<small>超限文件只登记名称与大小，不保存内容</small></span>
+          <span class="set-item-r"><input type="number" id="maxFileMB" min="5" max="90" step="5" placeholder="50" class="set-num"><span>MB</span></span>
+        </div>
+      </div>
+      <div class="set-form" id="ghForm">
+        <div class="set-row set-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+          <div><div class="lbl-row"><label>Owner（用户名 / 组织）</label><label class="mask-tg"><input type="checkbox" id="maskOwner">脱敏</label></div><input type="text" id="ghOwner" placeholder="例如 octocat" autocomplete="off"></div>
+          <div><div class="lbl-row"><label>Repo（私有仓库）</label><label class="mask-tg"><input type="checkbox" id="maskRepo">脱敏</label></div><input type="text" id="ghRepo" placeholder="例如 my-treasure-box" autocomplete="off"></div>
+          <div><label>Branch（默认 main）</label><input type="text" id="ghBranch" placeholder="main"></div>
+          <div><label>存储目录（前缀）</label><input type="text" id="ghDir" placeholder="treasure-box"></div>
+        </div>
+        <label>Personal Access Token</label>
+        <input type="password" id="ghToken" placeholder="ghp_…（仅保存在本机浏览器）">
+        <div class="set-row">
+          <button class="btn ghost mini" id="ghTestBtn">测试连接</button>
+          <button class="btn ghost mini" id="ghDiagBtn">同步自检</button>
+          <button class="btn ghost mini" id="ghSyncBtn">立即同步</button>
+          <button class="btn ghost mini" id="ghMergeBtn">拉取并合并</button>
+          <button class="btn ghost mini" id="ghPullBtn">覆盖式恢复</button>
+          <button class="btn primary mini" id="ghSaveBtn">保存配置</button>
+        </div>
+      </div>
+      <div class="set-note">Token 只保存在本机浏览器，不会写进分享版 HTML。数据存在仓库的 <code id="ghPathHint">treasure-box/state.json</code> 以及 images/、files/ 目录。</div>
+    </div>
+
+    <div class="set-sec" id="secLook">
+      <b>🎨 外观与显示</b>
+      <div class="set-list">
+        <div class="set-item">
+          <span class="set-item-t">个人头像</span>
+          <span class="set-item-r set-actions">
+            <span class="avatar" id="avatarBox2" style="width:34px;height:34px;font-size:18px">🧸</span>
+            <button class="btn ghost mini" id="avatarUploadBtn">上传</button>
+            <button class="btn ghost mini" id="avatarEmojiBtn">Emoji</button>
+            <button class="btn ghost mini" id="avatarClearBtn">清除</button>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none">
+          </span>
+        </div>
+        <div class="set-item">
+          <span class="set-item-t">背景图片<small>替换每个收纳夹顶部的渐变横幅</small></span>
+          <span class="set-item-r set-actions">
+            <button class="btn ghost mini" id="bgUploadBtn">上传</button>
+            <button class="btn ghost mini" id="bgClearBtn">清除</button>
+            <input type="file" id="bgInput" accept="image/*" style="display:none">
+          </span>
+        </div>
+        <label class="set-item">
+          <span class="set-item-t">作为整个页面背景<small>内容区自动加半透明遮罩保证可读性</small></span>
+          <span class="set-item-r"><input type="checkbox" id="pageBgChk" class="set-sw"></span>
+        </label>
+        <div class="set-item" id="topBgRow">
+          <span class="set-item-t">顶部栏背景</span>
+          <span class="set-item-r set-actions">
+            <button class="btn ghost mini" id="topBgUploadBtn">上传</button>
+            <button class="btn ghost mini" id="topBgClearBtn">清除</button>
+            <input type="file" id="topBgInput" accept="image/*" style="display:none">
+          </span>
+        </div>
+        <label class="set-item">
+          <span class="set-item-t">主题色<small>背景渐变、按钮底色、进度条</small></span>
+          <span class="set-item-r"><input type="color" id="customAccent" value="#5B99E2" class="set-color" title="只影响背景渐变、按钮底色、进度条等装饰，不会改变任何文字颜色"></span>
+        </label>
+        <label class="set-item">
+          <span class="set-item-t">字体颜色<small>全站文字、按钮文字与选中态</small></span>
+          <span class="set-item-r"><input type="color" id="customText" value="#2D3A4A" class="set-color" title="控制全站文字，与主题色互不影响"><button class="btn ghost mini" id="customTextClear" title="恢复默认文字颜色">默认</button></span>
+        </label>
+        <div class="set-item">
+          <span class="set-item-t">字体大小</span>
+          <span class="set-item-r"><select id="uiScaleSel" class="set-sel">
+            <option value="0.9">小</option><option value="1">标准</option><option value="1.1">大</option><option value="1.2">特大</option>
+          </select></span>
+        </div>
+      </div>
+      <div class="set-note">主题色只管背景与装饰，字体颜色只管所有文字与按钮文字；两者互不影响。</div>
+    </div>
+
+    <div class="set-sec" id="llmSec">
+      <b>🤖 接入大模型</b>
+      <div class="set-list">
+        <div class="set-item">
+          <span class="set-item-t">服务状态<small>OpenAI 兼容 /chat/completions</small></span>
+          <span class="set-item-r"><span id="llmStatus" class="usage-line">未配置</span></span>
+        </div>
+      </div>
+      <div class="set-form show">
+        <div class="set-row set-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label>服务商预设</label>
+            <select id="llmPreset" style="width:100%;padding:8px 10px;border-radius:9px;border:none;background:var(--el-bg);box-shadow:var(--inset);color:var(--text);outline:none">
+              <option value="deepseek">DeepSeek（注册送额度）</option>
+              <option value="zhipu">智谱 GLM-4-Flash（永久免费）</option>
+              <option value="siliconflow">硅基流动（小模型永久免费）</option>
+              <option value="qianfan">百度千帆·ERNIE-Speed（永久免费）</option>
+              <option value="hunyuan">腾讯混元-Lite（永久免费）</option>
+              <option value="volc">火山引擎·豆包（每日免费额度）</option>
+              <option value="qwen">通义千问（兼容模式）</option>
+              <option value="moonshot">Moonshot / Kimi</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini（免费限速，需国际网络）</option>
+              <option value="openrouter">OpenRouter（免费模型，需国际网络）</option>
+              <option value="custom">自定义</option>
+            </select></div>
+          <div><label>模型名称</label><input type="text" id="llmModel" placeholder="deepseek-chat" autocomplete="off"></div>
+        </div>
+        <label>接口地址（Base URL）</label>
+        <input type="text" id="llmBase" placeholder="https://api.deepseek.com/v1" autocomplete="off">
+        <label>API Key</label>
+        <input type="password" id="llmKey" placeholder="sk-…（仅保存在当前浏览器）" autocomplete="off">
+        <div class="set-row">
+          <button class="btn primary mini" id="llmSaveBtn">保存配置</button>
+          <button class="btn ghost mini" id="llmTestBtn">测试连接</button>
+          <button class="btn ghost mini" id="llmClearBtn">清除密钥</button>
+        </div>
+      </div>
+      <div class="set-note">想零成本接入：智谱 GLM-4-Flash、百度 ERNIE-Speed-8K、腾讯混元-Lite、硅基流动 9B 以下小模型都是<b>永久免费</b>（注册后在控制台创建 API Key 填进来即可）；火山引擎豆包每天重置免费额度；Gemini / OpenRouter 免费但需国际网络。免费政策可能调整，以各官网为准。密钥只存在本机浏览器，不会写进你的数据、分享版 HTML 或云端同步；请求经本站服务端转发以避免跨域，服务端不保存密钥。配置完成后，主页的「🤖 AI 助手」板块即可直接对话。</div>
+    </div>
+
+    <div class="set-sec" id="secShare">
+      <b>📤 分享链接</b>
+      <div class="set-list">
+        <label class="set-item">
+          <span class="set-item-t">包含分享数据<small>开启后链接与分享版带上我的笔记、分类与附件</small></span>
+          <span class="set-item-r"><input type="checkbox" id="shareIncludeData" class="set-sw"></span>
+        </label>
+        <div class="set-item" id="shareScopeRow">
+          <span class="set-item-t">数据范围<small>仅在「包含分享数据」开启时生效</small></span>
+          <span class="set-item-r"><select id="shareScopeSel" class="set-sel">
+            <option value="all">公开全部内容</option>
+            <option value="structure">只展示结构</option>
+          </select></span>
+        </div>
+        <button type="button" class="set-item set-tap" id="shareSyncBtn">
+          <span class="set-item-t">同步我的数据到链接<small>推送当前笔记、分类与附件，访客打开链接即见最新数据</small></span>
+          <span class="set-item-r"><span class="set-chev">›</span></span>
+        </button>
+        <button type="button" class="set-item set-tap" id="shareExportBtn">
+          <span class="set-item-t">生成分享版 HTML<small>导出独立文件，可自己部署成链接</small></span>
+          <span class="set-item-r"><span class="set-chev">›</span></span>
+        </button>
+        <button type="button" class="set-item set-tap" id="shareCopyLinkBtn">
+          <span class="set-item-t">复制当前访问链接<small>复制的是线上地址 + sharecode，别人打开即可访问</small></span>
+          <span class="set-item-r"><span class="set-chev">›</span></span>
+        </button>
+      </div>
+      <div class="set-note">「同步我的数据到链接」把当前数据推送到线上（GitHub 配置与 API 密钥不会上传），改动内容后重新点一次即可让访客看到最新版。无论从线上还是本地打开本页，「复制当前访问链接」给出的都是线上地址，不会把 localhost 或本地文件地址发出去。</div>
+    </div>
+
+    <div class="set-sec" id="secStorage">
+      <b>💾 存储与缓存</b>
+      <div class="set-list">
+        <div class="set-item">
+          <span class="set-item-t">存储用量</span>
+          <span class="set-item-r"><span id="usageBox" class="usage-line">统计中…</span></span>
+        </div>
+        <button type="button" class="set-item set-tap" id="snapBtn"><span class="set-item-t">历史版本<small>每 3 分钟自动留一份，最多 8 份</small></span><span class="set-item-r"><span class="set-chev">›</span></span></button>
+        <button type="button" class="set-item set-tap" id="cleanOrphanBtn"><span class="set-item-t">清理孤立数据</span><span class="set-item-r"><span class="set-chev">›</span></span></button>
+        <button type="button" class="set-item set-tap" id="cloudOnlyBtn"><span class="set-item-t">仅云端的文件</span><span class="set-item-r"><span class="set-chev">›</span></span></button>
+        <button type="button" class="set-item set-tap" id="clearAllCacheBtn"><span class="set-item-t">清理大文件缓存<small>释放本机超过 5MB 的文件副本</small></span><span class="set-item-r"><span class="set-chev">›</span></span></button>
+      </div>
+      <div class="set-note">清理不会删除云端备份；卡片仍在原位，点开时会自动重新拉取。</div>
+    </div>
+
+    <div class="set-sec" id="secAbout">
+      <b>📣 关于</b>
+      <div class="set-list">
+        <button type="button" class="set-item set-tap" id="whatsNewBtn">
+          <span class="set-item-t">更新公告<small>这一版新增 / 优化 / 修复了什么</small></span>
+          <span class="set-item-r"><span id="wnVer">v2.32</span><span class="set-chev">›</span></span>
+        </button>
+      </div>
+      <div class="set-note">首次进入和每次更新后首次进入都会自动弹一次，看过之后不再打扰。</div>
+    </div>
+
+    <div class="set-foot">OVOvv · 数据只保存在你自己的浏览器</div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div id="modalMask">
+  <div class="modal">
+    <h3 id="modalTitle">编辑条目</h3>
+    <div id="modalFields"></div>
+    <div class="modal-foot">
+      <button class="btn danger" id="modalDelete">删除</button>
+      <button class="btn ghost" id="modalCancel">取消</button>
+      <button class="btn primary" id="modalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用列表面板（回收站 / 历史版本） -->
+<div id="panelMask">
+  <div class="modal" style="width:min(640px,94vw)">
+    <h3 id="panelTitle">—</h3>
+    <div class="set-hint" id="panelHint"></div>
+    <div class="panel-body" id="panelBody"></div>
+    <div class="modal-foot" id="panelFoot"></div>
+  </div>
+</div>
+
+<!-- 自定义弹窗 / 命令面板 / 卡片更多菜单 -->
+<div id="dlgMask" role="dialog" aria-modal="true"></div>
+<div id="cmdkMask"><div id="cmdkBox"><input id="cmdkInput" placeholder="搜索或输入命令…（条目 / 收纳夹 / 操作）" aria-label="命令面板搜索" autocomplete="off"><div id="cmdkList" role="listbox"></div></div></div>
+<div id="moreMenu" role="menu"></div>
+
+
+<!-- ============================================================
+     脚本按功能模块顺序加载（36 个模块，顺序不可调整）
+     改某个功能，只需要打开 js/ 下对应的那一个文件
+     ============================================================ -->
+  <script src="js/00-utils.js"></script>
+  <script src="js/01-config.js"></script>
+  <script src="js/02-store.js"></script>
+  <script src="js/03-trash.js"></script>
+  <script src="js/04-snapshot.js"></script>
+  <script src="js/05-undo.js"></script>
+  <script src="js/06-dialog.js"></script>
+  <script src="js/07-command-palette.js"></script>
+  <script src="js/08-home-layout.js"></script>
+  <script src="js/09-appearance.js"></script>
+  <script src="js/10-idb-images.js"></script>
+  <script src="js/11-render.js"></script>
+  <script src="js/12-search-core.js"></script>
+  <script src="js/13-roam.js"></script>
+  <script src="js/14-lazy-image.js"></script>
+  <script src="js/15-add-item.js"></script>
+  <script src="js/16-card-actions.js"></script>
+  <script src="js/17-edit-modal.js"></script>
+  <script src="js/18-lightbox.js"></script>
+  <script src="js/19-sidebar.js"></script>
+  <script src="js/20-search-ui.js"></script>
+  <script src="js/21-batch.js"></script>
+  <script src="js/22-drag-drop.js"></script>
+  <script src="js/23-backup.js"></script>
+  <script src="js/24-github-cloud.js"></script>
+  <script src="js/25-file-cache.js"></script>
+  <script src="js/26-sync.js"></script>
+  <script src="js/27-share-export.js"></script>
+  <script src="js/28-settings.js"></script>
+  <script src="js/29-cache-panel.js"></script>
+  <script src="js/30-reader.js"></script>
+  <script src="js/31-pdf-index.js"></script>
+  <script src="js/32-editor.js"></script>
+  <script src="js/33-editor-plus.js"></script>
+  <script src="js/34-table-view.js"></script>
+  <script src="js/35-panels.js"></script>
+  <script src="js/38-block-menu.js"></script>
+
+  <script src="js/39-selection-bar.js"></script>
+  <script src="js/40-home-blocks.js"></script>
+  <!-- 启动必须放在所有模块之后：boot 会立即 renderAll，主页板块模块（40）若未加载，主页会渲染成空状态 -->
+  <script src="js/36-boot.js"></script>
+  <script src="js/41-splash.js"></script>
+  <script src="js/42-merge-docs.js"></script>
+  <script src="js/43-grid-view.js"></script>
+  <script src="js/44-canvas-board.js"></script>
+  <script src="js/45-ai-news.js"></script>
+  <script src="js/46-llm.js"></script>
+  <script src="js/47-share-fresh.js"></script>
+  <script src="js/48-whats-new.js"></script>
+</body>
+</html>
